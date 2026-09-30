@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Electron Orbital Viewer</title>
+  <style>
+    :root {
+      --bg: #111;
+      --panel: #181a1f;
+      --panel-2: #20232a;
+      --line: #2c3038;
+      --text: #e6e8eb;
+      --muted: #8b929c;
+      --accent: #5b9cff;
+      --plus: #e8453c;
+      --minus: #3b82f6;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    body { display: flex; }
+
+    /* ---------- sidebar ---------- */
+    #sidebar {
+      width: 250px;
+      flex: none;
+      height: 100%;
+      overflow-y: auto;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      padding: 18px 14px 24px;
+    }
+    #sidebar h1 {
+      font-size: 17px;
+      font-weight: 650;
+      margin: 0 0 2px 4px;
+      letter-spacing: 0.2px;
+    }
+    #sidebar .tagline {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0 0 16px 4px;
+    }
+    .group { margin-bottom: 14px; }
+    .group h2 {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin: 0 0 6px 4px;
+    }
+    .group .items {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+    }
+    .group.wide .items { grid-template-columns: repeat(2, 1fr); }
+    .orb {
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 7px 4px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .orb:hover { background: #2a2e37; }
+    .orb.active {
+      background: #1d2d48;
+      border-color: var(--accent);
+    }
+    .orb sub { font-size: 0.72em; }
+
+    /* ---------- viewport ---------- */
+    #viewport {
+      position: relative;
+      flex: 1;
+      height: 100%;
+      min-width: 0;
+    }
+    #viewport canvas { display: block; }
+    #labels {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .axis-label {
+      color: #9aa1ab;
+      font-size: 14px;
+      font-style: italic;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .card {
+      position: absolute;
+      background: rgba(24, 26, 31, 0.82);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      backdrop-filter: blur(6px);
+    }
+    #info {
+      top: 14px;
+      left: 14px;
+      padding: 12px 16px 13px;
+      max-width: min(440px, calc(100% - 28px));
+    }
+    #info .title {
+      font-size: 26px;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+    #info .title sub { font-size: 0.6em; }
+    #info .desc { margin-top: 5px; font-size: 14px; }
+    #info .facts {
+      margin-top: 7px;
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    #info .facts sub { font-size: 0.8em; }
+    #chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+    #chips:empty { display: none; }
+    .chip {
+      font: inherit;
+      font-size: 12px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .chip.on { color: var(--text); border-color: var(--accent); }
+
+    #hud-bottom {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 10px;
+      pointer-events: none;
+    }
+    #hud-bottom .card { position: static; pointer-events: auto; }
+    #legend {
+      padding: 9px 13px;
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .swatch {
+      display: inline-block;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: -1px;
+    }
+
+    #controls {
+      padding: 10px 14px;
+      font-size: 13px;
+      display: grid;
+      gap: 7px;
+      min-width: 200px;
+    }
+    #controls label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    #controls input[type="range"] { flex: 1; accent-color: var(--accent); }
+    #controls input[type="checkbox"] { accent-color: var(--accent); }
+    #controls select {
+      font: inherit;
+      font-size: 12.5px;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 2px 4px;
+    }
+    #controls .hint { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+    #sourcelink {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+    #sourcelink a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+    #sourcelink a:hover { color: var(--accent); text-decoration: underline; }
+    #sourcelink .author {
+      display: block;
+      color: var(--muted);
+      font-size: 10.5px;
+      opacity: 0.75;
+    }
+
+    #loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 14px;
+      color: var(--muted);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    #loading.show { opacity: 1; }
+
+    #menu {
+      display: none;
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 5;
+      font: inherit;
+      font-size: 13px;
+      padding: 7px 12px;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+
+    /* narrow screens: sidebar slides over the viewport */
+    @media (max-width: 760px) {
+      #sidebar {
+        position: absolute;
+        z-index: 10;
+        transform: translateX(-100%);
+        transition: transform 0.2s;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+      }
+      body.menu-open #sidebar { transform: none; }
+      #menu { display: block; }
+      #info { max-width: calc(100% - 100px); }
+      #info .title { font-size: 21px; }
+      #controls .hint { display: none; }
+      #hud-bottom { flex-direction: column; align-items: stretch; }
+      #legend { line-height: 1.5; }
+    }
+  </style>
+</head>
+<body>
+  <aside id="sidebar">
+    <h1>Electron Orbital<br>Viewer</h1>
+    <p class="tagline">Hydrogen-like orbitals and hybrids</p>
+    <nav id="list"></nav>
+  </aside>
+
+  <main id="viewport">
+    <div id="labels"></div>
+
+    <div id="info" class="card">
+      <div class="title" id="title"></div>
+      <div class="desc" id="desc"></div>
+      <div class="facts" id="facts"></div>
+      <div id="chips"></div>
+    </div>
+
+    <div id="hud-bottom">
+    <div id="legend" class="card">
+      <div id="legend-colors"></div>
+      <div>Surfaces enclose <span id="pct">90%</span> of the electron</div>
+    </div>
+
+    <div id="sourcelink" class="card">
+      <a href="https://github.com/jfblanchard/electron-orbital-viewer" target="_blank" rel="noopener">Source</a>
+      <span class="author">by jfblanchard</span>
+    </div>
+
+    <div id="controls" class="card">
+      <label>Opacity <input type="range" id="opacity" min="0.1" max="1" step="0.01" value="0.5" /></label>
+      <label>Surface holds
+        <select id="fraction">
+          <option value="0.5">50%</option>
+          <option value="0.75">75%</option>
+          <option value="0.9" selected>90%</option>
+          <option value="0.95">95%</option>
+        </select>
+        of the electron
+      </label>
+      <label><input type="checkbox" id="spin" checked /> Auto-rotate</label>
+      <label><input type="checkbox" id="axes" checked /> Axes</label>
+      <label><input type="checkbox" id="truescale" /> True relative size</label>
+      <div class="hint">Drag to rotate · scroll to zoom · right-drag to pan</div>
+    </div>
+    </div>
+
+    <div id="loading">Computing…</div>
+    <button id="menu">Orbitals</button>
+  </main>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
