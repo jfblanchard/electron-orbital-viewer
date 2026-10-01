@@ -192,11 +192,20 @@
     #controls .hint { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 
     #sourcelink {
-      padding: 6px 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 13px;
       font-size: 12px;
+      color: var(--text);
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
     }
-    #sourcelink a { color: var(--muted); text-decoration: none; }
-    #sourcelink a:hover { color: var(--accent); text-decoration: underline; }
+    #sourcelink .label { color: var(--muted); }
+    #sourcelink .url { color: var(--accent); }
+    #sourcelink:hover { border-color: var(--accent); background: rgba(91, 156, 255, 0.12); }
+    #sourcelink:hover .url { text-decoration: underline; }
 
     #loading {
       position: absolute;
@@ -268,9 +277,10 @@
       <div>Surfaces enclose <span id="pct">90%</span> of the electron</div>
     </div>
 
-    <div id="sourcelink" class="card">
-      <a href="https://github.com/jfblanchard/electron-orbital-viewer" target="_blank" rel="noopener">Source</a>
-    </div>
+    <a id="sourcelink" class="card" href="https://github.com/jfblanchard/electron-orbital-viewer" target="_blank" rel="noopener">
+      <span class="label">Source:</span>
+      <span class="url">github.com/jfblanchard/electron-orbital-viewer</span>
+    </a>
 
     <div id="controls" class="card">
       <label>Opacity <input type="range" id="opacity" min="0.1" max="1" step="0.01" value="0.5" /></label>

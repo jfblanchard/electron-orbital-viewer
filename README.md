@@ -20,17 +20,15 @@ directly, in a way a printed diagram can't.
   surfaces enclose exactly the requested fraction of the electron; sign coloring
   follows the wavefunction phase.
 
-## Try it
+## Screenshots
 
-Deploy a live copy to Cloudflare Pages with the Wrangler CLI:
+| 2p<sub>z</sub> | 3d<sub>xy</sub> | sp³ |
+|:---:|:---:|:---:|
+| ![2pz orbital](assets/README-cap-2pz.png) | ![3dxy orbital](assets/README-cap-3dxy.png) | ![sp3 hybrids](assets/README-cap-sp3.png) |
 
-```bash
-cd deploy
-wrangler pages deploy . --project-name electron-orbital-viewer
-```
+## Try it live
 
-The site then lives at `https://electron-orbital-viewer.*.workers.dev` (your
-Cloudflare account's wildcard subdomain), or run it locally as below.
+**<https://orbital-viewer.pages.dev>**
 
 ## Run locally
 
@@ -38,6 +36,13 @@ Cloudflare account's wildcard subdomain), or run it locally as below.
 cd deploy
 python3 -m http.server 8000
 # open http://localhost:8000   (a server is required — ES modules + a Web Worker)
+```
+
+To deploy your own copy to Cloudflare Pages:
+
+```bash
+cd deploy
+npx wrangler pages deploy . --project-name <your-project-name>
 ```
 
 ## Tests
@@ -51,6 +56,7 @@ node tests/test_orbitals.mjs
 ```
 deploy/   self-contained web app — the deploy unit (see deploy/README.md)
 tests/    Node checks for the orbital math and surface meshes
+assets/   README screenshots
 ```
 
 ## License / source
