@@ -452,8 +452,19 @@ $('fraction').addEventListener('change', () => {
   keepView = true;
   select(current);
 });
-$('menu').addEventListener('click', () => document.body.classList.toggle('menu-open'));
-renderer.domElement.addEventListener('pointerdown', () => document.body.classList.remove('menu-open'));
+$('menu').addEventListener('click', () => {
+  document.body.classList.remove('settings-open');
+  document.body.classList.toggle('menu-open');
+});
+$('settings').addEventListener('click', () => {
+  document.body.classList.remove('menu-open');
+  document.body.classList.toggle('settings-open');
+});
+$('settings-close').addEventListener('click', () => document.body.classList.remove('settings-open'));
+renderer.domElement.addEventListener('pointerdown', () => {
+  document.body.classList.remove('menu-open');
+  document.body.classList.remove('settings-open');
+});
 
 // Arrow keys step through the list.
 window.addEventListener('keydown', (e) => {

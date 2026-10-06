@@ -220,10 +220,9 @@
     }
     #loading.show { opacity: 1; }
 
-    #menu {
+    #menu, #settings {
       display: none;
       position: absolute;
-      top: 14px;
       right: 14px;
       z-index: 5;
       font: inherit;
@@ -233,6 +232,20 @@
       color: var(--text);
       border: 1px solid var(--line);
       border-radius: 6px;
+    }
+    #menu { top: 14px; }
+    #settings { top: 52px; }
+    #settings-close {
+      display: none;
+      font: inherit;
+      font-size: 12px;
+      padding: 4px 10px;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      cursor: pointer;
+      justify-self: end;
     }
 
     /* narrow screens: sidebar slides over the viewport */
@@ -245,9 +258,19 @@
         box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
       }
       body.menu-open #sidebar { transform: none; }
-      #menu { display: block; }
+      #menu, #settings { display: block; }
       #info { max-width: calc(100% - 100px); }
       #info .title { font-size: 21px; }
+      #controls { display: none; }
+      body.settings-open #controls {
+        display: grid;
+        position: fixed;
+        top: 92px;
+        left: 14px;
+        right: 14px;
+        z-index: 9;
+      }
+      #settings-close { display: block; }
       #controls .hint { display: none; }
       #hud-bottom { flex-direction: column; align-items: stretch; }
       #legend { line-height: 1.5; }
@@ -283,6 +306,7 @@
     </a>
 
     <div id="controls" class="card">
+      <button id="settings-close" title="Close settings">Done</button>
       <label>Opacity <input type="range" id="opacity" min="0.1" max="1" step="0.01" value="0.5" /></label>
       <label>Surface holds
         <select id="fraction">
@@ -302,6 +326,7 @@
 
     <div id="loading">Computing…</div>
     <button id="menu">Orbitals</button>
+    <button id="settings">Settings</button>
   </main>
 
   <script type="importmap">
