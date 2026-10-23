@@ -81,6 +81,8 @@
       border-color: var(--accent);
     }
     .orb sub { font-size: 0.72em; }
+    .orb .molname { display: block; font-size: 10.5px; color: var(--muted); white-space: normal; }
+    #info .title .name { font-size: 14px; font-weight: 500; color: var(--muted); }
 
     /* ---------- viewport ---------- */
     #viewport {
@@ -280,7 +282,7 @@
 <body>
   <aside id="sidebar">
     <h1>Electron Orbital<br>Viewer</h1>
-    <p class="tagline">Hydrogen-like orbitals and hybrids</p>
+    <p class="tagline">Orbitals, hybrids &amp; molecules</p>
     <nav id="list"></nav>
   </aside>
 
@@ -318,6 +320,7 @@
         of the electron
       </label>
       <label><input type="checkbox" id="spin" checked /> Auto-rotate</label>
+      <label><input type="checkbox" id="orbitals" checked /> Orbitals</label>
       <label><input type="checkbox" id="axes" checked /> Axes</label>
       <label><input type="checkbox" id="truescale" /> True relative size</label>
       <div class="hint">Drag to rotate · scroll to zoom · right-drag to pan</div>

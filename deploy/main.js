@@ -15,11 +15,23 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { ORBITALS, ORBITALS_BY_ID } from './orbitals.js';
+import { MOLECULES, MOLECULES_BY_ID } from './molecules.js';
+import { A0, ELEMENTS, canonical } from './molecules-lib.js';
 
 const A0_ANGSTROM = 0.529177; // Bohr radius in Å
 const PLUS_COLOR = '#e8453c';
 const MINUS_COLOR = '#3b82f6';
 const TRUE_SCALE_RADIUS = 34; // a0; frames the largest orbital (4f) in true-size mode
+
+// Molecular lobes are colored by role (σ / π / lone pair / H 1s), with the
+// small ψ < 0 lobe a darker shade; "color by sign" switches to red +/blue −.
+const ROLES = {
+  sigma: { color: '#38bdf8', label: 'σ hybrid', chip: 'σ' },
+  pi: { color: '#4ade80', label: 'π (unhybridized p)', chip: 'π' },
+  lp: { color: '#f5a524', label: 'Lone pair', chip: 'lone pairs' },
+  h1s: { color: '#e5e7eb', label: 'Hydrogen 1s', chip: 'H 1s' },
+};
+const ROLE_ORDER = ['sigma', 'pi', 'lp', 'h1s'];
 
 // ============================================================================
 // 1. SCENE
@@ -90,6 +102,58 @@ const nucleus = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0xffe6a8, emissive: 0x7a5a20, roughness: 0.4 }),
 );
 scene.add(nucleus);
+
+// CSS2D labels ignore their parent's visibility, so hide them explicitly too.
+function showAxes(on) {
+  axes.visible = on;
+  axisLabels.forEach((l) => { l.visible = on; });
+}
+
+// --- molecular framework ----------------------------------------------------
+// Ball-and-stick, opaque, drawn before the translucent lobes so the lobes
+// tint whatever sits behind them. Balls are kept small so the orbitals read.
+
+const sphereGeo = new THREE.SphereGeometry(1, 32, 20);
+const stickGeo = new THREE.CylinderGeometry(1, 1, 1, 16, 1);
+const atomMats = Object.fromEntries(Object.entries(ELEMENTS).map(([el, e]) => [
+  el, new THREE.MeshStandardMaterial({ color: e.color, roughness: 0.45, metalness: 0.05 }),
+]));
+const stickMat = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.5 });
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
+
+function buildFramework(mol) {
+  const group = new THREE.Group();
+  for (const at of mol.atoms) {
+    const m = new THREE.Mesh(sphereGeo, atomMats[at.el]);
+    m.position.set(...at.pos);
+    m.scale.setScalar(ELEMENTS[at.el].radius);
+    group.add(m);
+  }
+  // Multiple bonds are drawn as parallel sticks spread along the π direction,
+  // like the bent bonds of a model kit, so CO₂'s two C=O visibly turn 90°.
+  for (const b of mol.bonds) {
+    const p = new THREE.Vector3(...mol.atoms[b.a].pos);
+    const q = new THREE.Vector3(...mol.atoms[b.b].pos);
+    const axis = q.clone().sub(p);
+    const len = axis.length();
+    axis.normalize();
+    const perp = b.perp ? new THREE.Vector3(...b.perp) : new THREE.Vector3(1, 0, 0);
+    const offsets = b.order === 1 ? [0] : b.order === 2 ? [-1, 1] : [0, 120, 240];
+    const r = b.order === 1 ? 0.07 : 0.05;
+    for (const o of offsets) {
+      const shift = b.order === 3
+        ? perp.clone().applyAxisAngle(axis, THREE.MathUtils.degToRad(o)).multiplyScalar(0.085)
+        : perp.clone().multiplyScalar(0.075 * o);
+      const s = new THREE.Mesh(stickGeo, stickMat);
+      s.position.copy(p).add(q).multiplyScalar(0.5).add(shift);
+      s.quaternion.setFromUnitVectors(Y_AXIS, axis);
+      s.scale.set(r, len, r);
+      group.add(s);
+    }
+  }
+  return group;
+}
 
 function resize() {
   const w = viewport.clientWidth, h = viewport.clientHeight;
@@ -231,17 +295,30 @@ function buildGroup(res) {
 // queue; idle time prefetches the rest (at 90%) so later clicks are instant.
 
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
-const cache = new Map();   // key → THREE.Group
+const cache = new Map();   // key → THREE.Group (orbitals) or [{ sign, geometry }] (molecular lobes)
+const specs = new Map();   // key → worker request, for molecular lobes (no catalog id)
 const waiting = new Map(); // key → [resolve]
 const queue = [];
 let busy = null;
 
 worker.onmessage = (e) => {
   const res = e.data;
-  const group = buildGroup(res);
-  group.userData.members = res.members;
-  cache.set(res.key, group);
-  (waiting.get(res.key) || []).forEach((resolve) => resolve(group));
+  let out;
+  if (specs.has(res.key)) {
+    out = res.surfaces.map((s) => {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(s.positions, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(s.normals, 3));
+      geo.setIndex(new THREE.BufferAttribute(s.indices, 1));
+      geo.computeBoundingSphere();
+      return { sign: s.sign, geometry: geo };
+    });
+  } else {
+    out = buildGroup(res);
+    out.userData.members = res.members;
+  }
+  cache.set(res.key, out);
+  (waiting.get(res.key) || []).forEach((resolve) => resolve(out));
   waiting.delete(res.key);
   busy = null;
   pump();
@@ -252,8 +329,11 @@ function pump() {
   while (queue.length && cache.has(queue[0])) queue.shift();
   if (!queue.length) return;
   busy = queue.shift();
-  const [id, fraction] = busy.split('@');
-  worker.postMessage({ key: busy, id, fraction: +fraction });
+  const msg = specs.get(busy) || (() => {
+    const [id, fraction] = busy.split('@');
+    return { key: busy, id, fraction: +fraction };
+  })();
+  worker.postMessage(msg);
 }
 
 const keyOf = (id, fraction) => `${id}@${fraction}`;
@@ -276,6 +356,60 @@ function prefetchAll() {
     const key = keyOf(o.id, 0.9);
     if (!cache.has(key) && !queue.includes(key) && busy !== key) queue.push(key);
   });
+  pump();
+}
+
+// --- molecular lobes --------------------------------------------------------
+//
+// Keys are "<canonical key>@<fraction>" and resolve to a list of
+// { sign, geometry } in a0, shared by every lobe of that shape.
+
+function shapeKey(o, fraction) {
+  const c = canonical(o);
+  const k = `${c.key}@${fraction}`;
+  // spheres need fewer cells than directional lobes
+  if (!specs.has(k)) specs.set(k, { key: k, Z: c.Z, terms: c.terms, fraction, N: c.n === 1 ? 64 : 80 });
+  return k;
+}
+
+/** All lobes of a molecule, each a rotated, scaled copy of its canonical shape. */
+async function buildOrbitals(mol, fraction) {
+  const keys = mol.orbitals.map((o) => shapeKey(o, fraction));
+  // urgent requests jump the queue; reverse so the first ends up in front
+  const unique = [...new Set(keys)];
+  const loaded = new Map();
+  await Promise.all(unique.reverse().map(async (k) => loaded.set(k, await request(k, true))));
+
+  const group = new THREE.Group();
+  mol.orbitals.forEach((o, idx) => {
+    const lobe = new THREE.Group();
+    lobe.position.set(...o.center);
+    if (o.dir) lobe.quaternion.setFromUnitVectors(Z_AXIS, new THREE.Vector3(...o.dir));
+    lobe.scale.setScalar(A0);
+    lobe.userData = { role: o.role };
+    for (const { sign, geometry } of loaded.get(keys[idx])) {
+      const back = new THREE.Mesh(geometry);
+      const front = new THREE.Mesh(geometry);
+      back.renderOrder = 1;
+      front.renderOrder = 2;
+      // the small ψ < 0 lobe behind each hybrid (π lobes are equal pairs, not "small")
+      const small = sign < 0 && o.role !== 'pi';
+      back.userData = { sign, role: o.role, side: 'back', small };
+      front.userData = { sign, role: o.role, side: 'front', small };
+      lobe.add(back, front);
+    }
+    group.add(lobe);
+  });
+  return group;
+}
+
+function prefetchMoleculeShapes(fraction) {
+  for (const mol of MOLECULES) {
+    for (const o of mol.orbitals) {
+      const k = shapeKey(o, fraction);
+      if (!cache.has(k) && !queue.includes(k) && busy !== k) queue.push(k);
+    }
+  }
   pump();
 }
 
@@ -310,6 +444,31 @@ for (const [key, title, cls] of GROUPS) {
     });
     items.append(b);
     buttons.set(o.id, b);
+  });
+  $('list').append(section);
+}
+
+// Molecule sections — the six whose hybrid/π orbitals this page can compute.
+const MOL_GROUPS = [
+  ['single', 'Molecules — σ only'],
+  ['pi', 'Molecules — σ + π'],
+];
+for (const [key, title] of MOL_GROUPS) {
+  const section = document.createElement('section');
+  section.className = 'group wide';
+  section.innerHTML = `<h2>${title}</h2><div class="items"></div>`;
+  const items = section.querySelector('.items');
+  MOLECULES.filter((m) => m.group === key).forEach((m) => {
+    const b = document.createElement('button');
+    b.className = 'orb';
+    b.innerHTML = `${m.formula} <span class="molname">${m.name}</span>`;
+    b.title = m.desc;
+    b.addEventListener('click', () => {
+      select(m.id);
+      document.body.classList.remove('menu-open');
+    });
+    items.append(b);
+    buttons.set(m.id, b);
   });
   $('list').append(section);
 }
@@ -393,12 +552,163 @@ function renderChips(o, group) {
   apply();
 }
 
+// --- molecule info & controls ------------------------------------------------
+
+const visibleRoles = { sigma: true, pi: true, lp: true, h1s: false };
+let showSmall = true;      // the little ψ < 0 lobe behind each hybrid
+let molColorBySign = false;
+let shownMol = null;       // Group (framework + lobes) currently in the scene
+let molPrefetched = false;
+
+function applyMolVisibility() {
+  if (!shownMol) return;
+  const lobes = shownMol.userData.lobes;
+  lobes.visible = $('orbitals').checked;
+  lobes.children.forEach((l) => {
+    const role = l.userData.role;
+    l.children.forEach((m) => {
+      m.visible = visibleRoles[role] && (showSmall || !m.userData.small);
+    });
+  });
+}
+
+function paintMol(group, bySign) {
+  group.traverse((m) => {
+    if (!m.isMesh) return;
+    const { sign, role, side } = m.userData;
+    const hue = ROLES[role].color;
+    const color = bySign ? (sign > 0 ? PLUS_COLOR : MINUS_COLOR) : (sign > 0 ? hue : darker(hue));
+    m.material = materialPair(color)[side];
+  });
+}
+
+function renderMolInfo(mol) {
+  $('title').innerHTML = `${mol.formula} <span class="name">${mol.name}</span>`;
+  $('desc').textContent = mol.desc;
+  const pi = mol.bonds.reduce((s, b) => s + b.order - 1, 0);
+  const lp = mol.orbitals.filter((o) => o.role === 'lp').length;
+  $('facts').innerHTML = [
+    `${mol.hybridization} · ${mol.shape} · ${mol.angle}`,
+    `${plural(mol.bonds.length, 'σ bond')} · ${plural(pi, 'π bond')} · ${plural(lp, 'lone pair')} · ${plural(mol.orbitals.length, 'orbital')}`,
+  ].join('<br>');
+}
+
+// Role chips: toggle σ / π / lone pairs / H 1s, the small back lobes, and
+// sign coloring. Same .chip style as the hybrid chips.
+function renderMolChips(mol) {
+  const chips = $('chips');
+  chips.innerHTML = '';
+  const roles = new Set(mol.orbitals.map((o) => o.role));
+  const toggle = (label, title, on, fn) => {
+    const c = document.createElement('button');
+    c.className = `chip${on ? ' on' : ''}`;
+    c.textContent = label;
+    c.title = title;
+    c.addEventListener('click', () => { fn(); c.classList.toggle('on'); });
+    chips.append(c);
+  };
+  for (const role of ROLE_ORDER) {
+    if (!roles.has(role)) continue;
+    toggle(ROLES[role].chip, `Show or hide ${ROLES[role].label}`, visibleRoles[role], () => {
+      visibleRoles[role] = !visibleRoles[role];
+      applyMolVisibility();
+      renderMolLegend(mol);
+    });
+  }
+  if (mol.orbitals.some((o) => o.role !== 'pi')) {
+    toggle('back lobes', 'Show or hide the small ψ < 0 lobe behind each hybrid', showSmall, () => {
+      showSmall = !showSmall;
+      applyMolVisibility();
+    });
+  }
+  toggle('color by sign', 'Color lobes by wavefunction sign instead of role', molColorBySign, () => {
+    molColorBySign = !molColorBySign;
+    paintMol(shownMol, molColorBySign);
+    renderMolLegend(mol);
+  });
+}
+
+function renderMolLegend(mol) {
+  const roles = new Set(mol.orbitals.map((o) => o.role));
+  $('legend-colors').innerHTML = molColorBySign
+    ? '<div><span class="swatch" style="background: var(--plus)"></span>ψ &gt; 0</div>'
+      + '<div><span class="swatch" style="background: var(--minus)"></span>ψ &lt; 0</div>'
+    : ROLE_ORDER.filter((r) => roles.has(r) && visibleRoles[r])
+      .map((r) => `<div><span class="swatch" style="background:${ROLES[r].color}"></span>${ROLES[r].label}</div>`)
+      .join('');
+}
+
+function frameMol(mol, animate = true) {
+  // Radius of the framework plus the molecular lobes — they hang well
+  // outside the bond ends. Sample vertices of the placed meshes; cheap.
+  let R = Math.max(...mol.atoms.map((a) => Math.hypot(...a.pos) + ELEMENTS[a.el].radius));
+  const lobes = shownMol.userData.lobes;
+  const v = new THREE.Vector3();
+  shownMol.updateMatrixWorld(true);
+  lobes.children.forEach((lobe) => {
+    if (lobe.userData.role === 'h1s') return;
+    lobe.children.forEach((m) => {
+      const pos = m.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i += 7) {
+        R = Math.max(R, v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld).length());
+      }
+    });
+  });
+  setAxisLength(R);
+  fitCamera(R, animate, mol.view || null);
+}
+
+async function selectMolecule(id) {
+  const mol = MOLECULES_BY_ID[id];
+  current = mol.id;
+  buttons.forEach((b, k) => b.classList.toggle('active', k === mol.id));
+  buttons.get(mol.id).scrollIntoView({ block: 'nearest' });
+  if (location.hash.slice(1) !== mol.id) history.replaceState(null, '', `#${mol.id}`);
+  renderMolInfo(mol);
+
+  if (shown) { scene.remove(shown); shown = null; }
+  if (shownMol) scene.remove(shownMol);
+  nucleus.visible = false;
+  showAxes(false);
+
+  const outer = new THREE.Group();
+  outer.add(buildFramework(mol));
+
+  const loading = setTimeout(() => $('loading').classList.add('show'), 120);
+  const fraction = +$('fraction').value;
+  const lobes = await buildOrbitals(mol, fraction);
+  clearTimeout(loading);
+  if (current !== mol.id || fraction !== +$('fraction').value) return;
+  $('loading').classList.remove('show');
+
+  paintMol(lobes, molColorBySign);
+  outer.userData.lobes = lobes;
+  outer.add(lobes);
+  scene.add(outer);
+  shownMol = outer;
+  document.body.dataset.shown = `${mol.id}@${fraction}`;
+
+  renderMolChips(mol);
+  applyMolVisibility();
+  renderMolLegend(mol);
+  $('pct').textContent = `${Math.round(fraction * 100)}%`;
+
+  frameMol(mol, !firstLoad || !keepView);
+  keepView = false;
+  firstLoad = false;
+  if (!molPrefetched) {
+    molPrefetched = true;
+    prefetchMoleculeShapes(fraction);
+  }
+}
+
 let current = null;
 let shown = null;
 let firstLoad = true;
 let keepView = false; // set when only the contour level changes
 
 async function select(id) {
+  if (MOLECULES_BY_ID[id]) return selectMolecule(id);
   const o = ORBITALS_BY_ID[id] || ORBITALS[0];
   current = o.id;
   buttons.forEach((b, k) => b.classList.toggle('active', k === o.id));
@@ -417,9 +727,14 @@ async function select(id) {
 
   const sameOrbital = shown && shown.userData.id === o.id;
   if (shown) scene.remove(shown);
+  if (shownMol) { scene.remove(shownMol); shownMol = null; }
+  nucleus.visible = true;
+  showAxes($('axes').checked);
   group.children.forEach((m) => { m.visible = true; });
+  group.visible = $('orbitals').checked;
   scene.add(group);
   shown = group;
+  document.body.dataset.shown = `${o.id}@${fraction}`;
   renderSize(group);
   renderChips(o, group);
   $('pct').textContent = `${Math.round(fraction * 100)}%`;
@@ -446,7 +761,11 @@ function frame(animate = true, moveCamera = true) {
 // Controls
 $('opacity').addEventListener('input', (e) => setOpacity(+e.target.value));
 $('spin').addEventListener('change', (e) => { controls.autoRotate = e.target.checked; });
-$('axes').addEventListener('change', (e) => { axes.visible = e.target.checked; });
+$('axes').addEventListener('change', (e) => showAxes(e.target.checked));
+$('orbitals').addEventListener('change', (e) => {
+  if (shownMol) shownMol.userData.lobes.visible = e.target.checked;
+  if (shown) shown.visible = e.target.checked;
+});
 $('truescale').addEventListener('change', () => frame(true));
 $('fraction').addEventListener('change', () => {
   keepView = true;
@@ -466,17 +785,18 @@ renderer.domElement.addEventListener('pointerdown', () => {
   document.body.classList.remove('settings-open');
 });
 
-// Arrow keys step through the list.
+// Arrow keys step through the whole list, orbitals then molecules.
+const NAV = [...ORBITALS.map((o) => o.id), ...MOLECULES.map((m) => m.id)];
 window.addEventListener('keydown', (e) => {
   if (['INPUT', 'SELECT'].includes(e.target.tagName) || !['ArrowUp', 'ArrowDown'].includes(e.key)) return;
   e.preventDefault();
-  const i = ORBITALS.findIndex((o) => o.id === current);
-  const next = ORBITALS[(i + (e.key === 'ArrowDown' ? 1 : -1) + ORBITALS.length) % ORBITALS.length];
-  select(next.id);
+  const i = NAV.indexOf(current);
+  const next = NAV[(i + (e.key === 'ArrowDown' ? 1 : -1) + NAV.length) % NAV.length];
+  select(next);
 });
 window.addEventListener('hashchange', () => {
   const id = location.hash.slice(1);
-  if (id !== current && ORBITALS_BY_ID[id]) select(id);
+  if (id !== current && (ORBITALS_BY_ID[id] || MOLECULES_BY_ID[id])) select(id);
 });
 
 // Render loop
