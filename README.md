@@ -1,8 +1,9 @@
 # Electron Orbital Viewer
 
-An interactive, textbook-style 3D viewer for **electron orbitals** (atomic
-orbitals and hybridization shapes) — built as a visual aid for quantum chemistry
-and organic chemistry concepts (VSEPR, bonding, orbitals).
+An interactive, textbook-style 3D viewer for **electron orbitals** — atomic
+orbitals, hybridization shapes, and hybrid/π orbitals on real molecular
+geometries — built as a visual aid for quantum chemistry and organic chemistry
+concepts (VSEPR, bonding, orbitals).
 
 Semi-transparent probability-density isosurfaces, sign-colored lobes, and free
 three.js rotation / zoom / pan let you explore the shape of the wavefunctions
@@ -14,6 +15,11 @@ directly, in a way a printed diagram can't.
   atoms (radial parts are hydrogenic; real spherical harmonics give the angular
   shapes).
 - **Hybridization shapes** — sp, sp², sp³, sp³d, sp³d².
+- **Molecular orbitals** — hybrid and π orbitals on six curated molecules:
+  CH₄ (methane), NH₃ (ammonia), H₂O (water), C₂H₄ (ethylene),
+  C₂H₂ (acetylene), CO₂ (carbon dioxide). Lobes are colored by role
+  (σ hybrid / π / lone pair / H 1s) or by wavefunction sign, over a
+  ball-and-stick framework at experimental geometry.
 - **Customizable display** — surface contour (50–95%), opacity, auto-rotate,
   axes, and true relative size.
 - **Physics-first math** — wavefunctions are normalized so ∫|ψ|² dV = 1, and
