@@ -14,9 +14,19 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { ORBITALS, ORBITALS_BY_ID } from './orbitals.js';
-import { MOLECULES, MOLECULES_BY_ID } from './molecules.js';
+import { ORBITALS as ALL_ORBITALS } from './orbitals.js';
+import { MOLECULES as ALL_MOLECULES } from './molecules.js';
 import { A0, ELEMENTS, canonical } from './molecules-lib.js';
+
+// Editions. The free site (orbital-viewer.pages.dev) shows the s, p and d
+// orbitals; the deluxe edition adds the f orbitals, hybrids and molecules.
+// Deep links to free orbitals (#1s ... #3dz2) must keep working forever.
+const DELUXE = false;
+const FREE_GROUPS = ['s', 'p', 'd'];
+const ORBITALS = DELUXE ? ALL_ORBITALS : ALL_ORBITALS.filter((o) => FREE_GROUPS.includes(o.group));
+const MOLECULES = DELUXE ? ALL_MOLECULES : [];
+const ORBITALS_BY_ID = Object.fromEntries(ORBITALS.map((o) => [o.id, o]));
+const MOLECULES_BY_ID = Object.fromEntries(MOLECULES.map((m) => [m.id, m]));
 
 const A0_ANGSTROM = 0.529177; // Bohr radius in Å
 const PLUS_COLOR = '#e8453c';
@@ -455,6 +465,7 @@ const GROUPS = [
 // Sidebar
 const buttons = new Map();
 for (const [key, title, cls] of GROUPS) {
+  if (!ORBITALS.some((o) => o.group === key)) continue;
   const section = document.createElement('section');
   section.className = `group ${cls}`;
   section.innerHTML = `<h2>${title}</h2><div class="items"></div>`;
@@ -480,6 +491,7 @@ const MOL_GROUPS = [
   ['pi', 'Molecules — σ + π'],
 ];
 for (const [key, title] of MOL_GROUPS) {
+  if (!MOLECULES.some((m) => m.group === key)) continue;
   const section = document.createElement('section');
   section.className = 'group wide';
   section.innerHTML = `<h2>${title}</h2><div class="items"></div>`;
@@ -498,6 +510,8 @@ for (const [key, title] of MOL_GROUPS) {
   });
   $('list').append(section);
 }
+
+if (!DELUXE) document.querySelector('.tagline').textContent = 'Atomic orbitals: s, p and d';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 

@@ -36,6 +36,12 @@ directly, in a way a printed diagram can't.
 
 **<https://orbital-viewer.pages.dev>**
 
+### Editions
+
+The hosted viewer is the free edition: the s, p and d orbitals. The deluxe
+edition adds the f orbitals, hybrids and molecules. To show everything in your
+own copy, set `DELUXE = true` near the top of `deploy/main.js`.
+
 ## Run locally
 
 ```bash
