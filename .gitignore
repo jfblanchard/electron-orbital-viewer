@@ -12,3 +12,6 @@ HANDOFF.md
 
 # Local dev docs carried over from orbital-viewer (never shipped)
 docs/dev/
+
+# local agent rules (never shipped)
+CLAUDE.md
