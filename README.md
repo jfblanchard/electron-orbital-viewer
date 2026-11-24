@@ -29,6 +29,9 @@ directly, in a way a printed diagram can't.
 
 **<https://orbital-viewer.pages.dev>**
 
+A deluxe edition adds the seven f orbitals, hybrid orbitals (sp to sp³d²), and
+hybrid and π orbitals on real molecules (CH₄, NH₃, H₂O, C₂H₄, C₂H₂, CO₂).
+
 
 ## Run locally
 
