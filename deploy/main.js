@@ -511,7 +511,7 @@ for (const [key, title] of MOL_GROUPS) {
   $('list').append(section);
 }
 
-if (!DELUXE) document.querySelector('.tagline').textContent = 'Atomic orbitals: s, p and d';
+if (DELUXE) document.querySelector('.tagline').textContent = 'Orbitals, hybrids & molecules';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 

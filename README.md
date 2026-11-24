@@ -1,9 +1,8 @@
 # Electron Orbital Viewer
 
-An interactive, textbook-style 3D viewer for **electron orbitals** — atomic
-orbitals, hybridization shapes, and hybrid/π orbitals on real molecular
-geometries — built as a visual aid for quantum chemistry and organic chemistry
-concepts (VSEPR, bonding, orbitals).
+An interactive, textbook-style 3D viewer for **atomic orbitals** (s, p and d),
+built as a visual aid for chemistry: shells, nodes, and the shapes behind
+bonding.
 
 Semi-transparent probability-density isosurfaces, sign-colored lobes, and free
 three.js rotation / zoom / pan let you explore the shape of the wavefunctions
@@ -11,15 +10,9 @@ directly, in a way a printed diagram can't.
 
 ## What's included
 
-- **Atomic orbitals** — 1s–4s, 2p/3p, all five 3d, all seven 4f for hydrogen-like
-  atoms (radial parts are hydrogenic; real spherical harmonics give the angular
+- **Atomic orbitals** — 1s–3s, 2p/3p, all five 3d for hydrogen-like atoms
+  (radial parts are hydrogenic; real spherical harmonics give the angular
   shapes).
-- **Hybridization shapes** — sp, sp², sp³, sp³d, sp³d².
-- **Molecular orbitals** — hybrid and π orbitals on six curated molecules:
-  CH₄ (methane), NH₃ (ammonia), H₂O (water), C₂H₄ (ethylene),
-  C₂H₂ (acetylene), CO₂ (carbon dioxide). Lobes are colored by role
-  (σ hybrid / π / lone pair / H 1s) or by wavefunction sign, over a
-  ball-and-stick framework at experimental geometry.
 - **Customizable display** — surface contour (50–95%), opacity, auto-rotate,
   axes, and true relative size.
 - **Physics-first math** — wavefunctions are normalized so ∫|ψ|² dV = 1, and
@@ -28,19 +21,14 @@ directly, in a way a printed diagram can't.
 
 ## Screenshots
 
-| 2p<sub>z</sub> | 3d<sub>xy</sub> | sp³ |
+| 2p<sub>z</sub> | 3d<sub>xy</sub> | 3d<sub>z²</sub> |
 |:---:|:---:|:---:|
-| ![2pz orbital](assets/README-cap-2pz.png) | ![3dxy orbital](assets/README-cap-3dxy.png) | ![sp3 hybrids](assets/README-cap-sp3.png) |
+| ![2pz orbital](assets/README-cap-2pz.png) | ![3dxy orbital](assets/README-cap-3dxy.png) | ![3dz2 orbital](assets/README-cap-3dz2.png) |
 
 ## Try it live
 
 **<https://orbital-viewer.pages.dev>**
 
-### Editions
-
-The hosted viewer is the free edition: the s, p and d orbitals. The deluxe
-edition adds the f orbitals, hybrids and molecules. To show everything in your
-own copy, set `DELUXE = true` near the top of `deploy/main.js`.
 
 ## Run locally
 
