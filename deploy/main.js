@@ -61,6 +61,32 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.autoRotate = true;
 controls.autoRotateSpeed = 0.8;
+controls.zoomSpeed = 0.35; // wheel zoom was far too fast; also clamp the range
+controls.minDistance = 2;
+controls.maxDistance = 300;
+
+// Mice and trackpads vary wildly in how they report wheel input: some send
+// one event per notch, smooth-scrolling mice send dozens, and high-resolution
+// wheels send huge deltas. OrbitControls turns every event into a zoom step,
+// so the same physical notch can zoom 2% or 50%. Instead, take over wheel
+// handling: one fixed-size zoom step per 35 ms, sign from the accumulated
+// delta. Fast scrolling still zooms quickly; a single notch always zooms a
+// little.
+let lastWheelStep = 0;
+let syntheticWheel = false;
+renderer.domElement.addEventListener('wheel', (e) => {
+  if (syntheticWheel) { syntheticWheel = false; return; } // let our own event through
+  e.preventDefault();
+  e.stopPropagation();
+  const now = performance.now();
+  if (now - lastWheelStep < 35) return;
+  lastWheelStep = now;
+  syntheticWheel = true;
+  renderer.domElement.dispatchEvent(new WheelEvent('wheel', {
+    deltaY: Math.sign(e.deltaY) * 150,
+    clientX: e.clientX, clientY: e.clientY, bubbles: true, cancelable: true,
+  }));
+}, { capture: true });
 
 // Soft fill plus a key light that rides with the camera, so the lit side
 // stays consistent however the orbital is turned.

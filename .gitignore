@@ -7,3 +7,8 @@ deploy/.wrangler/
 
 # Session resume/status doc — local working note, never shipped.
 HANDOFF.md
+# generated: hermes activity stamp (central-planning post-commit)
+.hermes/activity.log
+
+# Local dev docs carried over from orbital-viewer (never shipped)
+docs/dev/
